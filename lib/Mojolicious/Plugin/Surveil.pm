@@ -123,7 +123,9 @@ sub _default_route {
   $config->{path} = '/mojolicious/plugin/surveil';
 
   $app->routes->websocket($config->{path})->to(cb => sub {
-    shift->on(message => sub {
+    my $c = shift;
+    $c->inactivity_timeout(60);
+    $c->on(message => sub {
       my $action = j $_[1];
       my ($type, $target) = (delete $action->{type}, delete $action->{target});
       $app->log->debug(qq(Event "$type" on "$target" @{[j $action]}));
