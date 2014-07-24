@@ -10,8 +10,9 @@ Mojolicious::Plugin::Surveil - Surveil user actions
 
 =head1 DESCRIPTION
 
-L<Mojolicious::Plugin::Surveil> is a plugin which allow you to tap into every
-action a user does on your web page.
+L<Mojolicious::Plugin::Surveil> is a plugin which allow you to see every
+event a user trigger on your web page. It is meant as a debug tool for
+seeing events, even if the browser does not have a JavaScript console.
 
 Note: With great power, comes great responsibility.
 
