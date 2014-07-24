@@ -170,7 +170,7 @@ window.addEventListener('load', function(e) {
     socket.send(JSON.stringify({ type: 'load', target: 'window' }));
     for (i = 0; i < events.length; i++) {
       document.body.addEventListener(events[i], function(e) {
-        var data = {};
+        var data = { extra: {} };
         for (var prop in e) {
           if (!(typeof e[prop]).match(/^(boolean|number|string)$/)) continue;
           if (prop.match(/^[A-Z]/)) continue;
@@ -178,6 +178,7 @@ window.addEventListener('load', function(e) {
         }
         console.log(e);
         data.target = [e.target.tagName.toLowerCase(), e.target.id ? '#' + e.target.id : '', e.target.className ? '.' + e.target.className.replace(/ /g, '.') : ''].join('');
+        if (data.target.href) data.extra.href = '' + data.target.href;
         socket.send(JSON.stringify(data));
       });
     }
