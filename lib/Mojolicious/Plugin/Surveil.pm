@@ -166,6 +166,12 @@ __DATA__
 window.addEventListener('load', function(e) {
   var events = <%== $events %>;
   var socket = new WebSocket('<%= $surveil_url %>');
+  var console = window.console = window.console || {};
+
+  console.surveil = function() {
+    socket.send(JSON.stringify({ type: "console", target: "window", message: Array.prototype.slice.call(arguments) }));
+  };
+
   socket.onopen = function() {
     socket.send(JSON.stringify({ type: 'load', target: 'window' }));
     for (i = 0; i < events.length; i++) {
@@ -176,7 +182,6 @@ window.addEventListener('load', function(e) {
           if (prop.match(/^[A-Z]/)) continue;
           data[prop] = e[prop];
         }
-        console.log(e);
         data.target = [e.target.tagName.toLowerCase(), e.target.id ? '#' + e.target.id : '', e.target.className ? '.' + e.target.className.replace(/ /g, '.') : ''].join('');
         if (data.target.href) data.extra.href = '' + data.target.href;
         socket.send(JSON.stringify(data));
