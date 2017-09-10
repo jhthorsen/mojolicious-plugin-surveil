@@ -26,7 +26,6 @@ SYNOPSIS
     Use custom route:
 
       use Mojolicious::Lite;
-      use Mojo::JSON "j";
 
       plugin surveil => { path => "/surveil" };
 
