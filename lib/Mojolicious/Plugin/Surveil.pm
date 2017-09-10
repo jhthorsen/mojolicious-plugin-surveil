@@ -25,7 +25,7 @@ sub _after_render_hook {
       return if $format ne 'html';
       return if $enable_param and !$c->param($enable_param);
       my $js = $self->_javascript_code($c, $config);
-      $$output =~ s!<head>!<head>$js!;
+      $$output =~ s!</head>!$js</head>!;
     }
   );
 }
