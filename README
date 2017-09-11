@@ -2,7 +2,7 @@ NAME
     Mojolicious::Plugin::Surveil - Surveil user actions
 
 VERSION
-    0.01
+    0.02
 
 DESCRIPTION
     Mojolicious::Plugin::Surveil is a plugin which allow you to see every

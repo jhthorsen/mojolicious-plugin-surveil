@@ -3,7 +3,7 @@ use Mojo::Base 'Mojolicious::Plugin';
 
 use Mojo::JSON qw(encode_json decode_json);
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 sub register {
   my ($self, $app, $config) = @_;
@@ -73,7 +73,7 @@ Mojolicious::Plugin::Surveil - Surveil user actions
 
 =head1 VERSION
 
-0.01
+0.02
 
 =head1 DESCRIPTION
 
