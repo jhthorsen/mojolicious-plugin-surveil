@@ -8,7 +8,7 @@ our $VERSION = '0.02';
 sub register {
   my ($self, $app, $config) = @_;
 
-  $config->{events} ||= [qw(click touchstart touchcancel touchend)];
+  $config->{events} ||= [qw(blur click focus touchstart touchcancel touchend)];
 
   push @{$app->renderer->classes}, __PACKAGE__;
   $self->_after_render_hook($app, $config);
