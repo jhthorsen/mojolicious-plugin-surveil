@@ -8,22 +8,19 @@ our $VERSION = '0.02';
 sub register {
   my ($self, $app, $config) = @_;
 
-  $app->defaults(
-    surveil => {
-      enable_param => $config->{enable_param} || '_surveil',
-      events       => $config->{events}       || [qw(blur click focus touchstart touchcancel touchend)],
-      path         => '/mojolicious/plugin/surveil',
-    }
-  );
+  $config->{enable_param} ||= '_surveil';
+  $config->{events}       ||= [qw(blur click focus touchstart touchcancel touchend)];
+  $config->{path}         ||= '/mojolicious/plugin/surveil';
 
   push @{$app->renderer->classes}, __PACKAGE__;
-  $app->hook(after_render => \&_after_render_hook);
-  $app->routes->websocket($app->defaults->{surveil}{path})->to(cb => \&_action_ws);
+  $app->hook(after_render => sub { _hook_after_render($config, @_) });
+  $app->routes->websocket($config->{path})->to(cb => sub { _action_ws($config, @_) });
 }
 
 sub _action_ws {
-  my $c   = shift->inactivity_timeout(60);
-  my $log = $c->app->log;
+  my $config = shift;
+  my $c      = shift->inactivity_timeout(60);
+  my $log    = $c->app->log;
 
   $c->on(
     message => sub {
@@ -34,18 +31,18 @@ sub _action_ws {
   );
 }
 
-sub _after_render_hook {
-  my ($c, $output, $format) = @_;
+sub _hook_after_render {
+  my ($config, $c, $output, $format) = @_;
   return if $format ne 'html';
-  return if !$c->param($c->stash->{surveil}{enable_param});
+  return if !$c->param($config->{enable_param});
 
   my $scheme = $c->req->url->to_abs->scheme || 'http';
   $scheme =~ s!^http!ws!;
 
   my $js = $c->render_to_string(
     template    => 'mojolicious/plugin/surveil',
-    events      => encode_json($c->stash->{surveil}{events}),
-    surveil_url => $c->url_for($c->stash->{surveil}{path})->to_abs->scheme($scheme),
+    events      => encode_json($config->{events}),
+    surveil_url => $c->url_for($config->{path})->to_abs->scheme($scheme),
   );
 
   $$output =~ s!</head>!$js</head>!;
@@ -69,8 +66,6 @@ L<Mojolicious::Plugin::Surveil> is a plugin which allow you to see every
 event a user trigger on your web page. It is meant as a debug tool for
 seeing events, even if the browser does not have a JavaScript console.
 
-Note: With great power, comes great responsibility.
-
 CAVEAT: The JavaScript that is injected require WebSocket in the browser to
 run. The surveil events are attached to the "body" element, so any other event
 that prevent events from bubbling will not emit this to the WebSocket
@@ -78,70 +73,54 @@ resource.
 
 =head1 SYNOPSIS
 
-Use default logging:
+=head2 Application
 
   use Mojolicious::Lite;
   plugin "surveil";
-  app->start;
 
-Use custom route:
+=head2 In your browser
 
-  use Mojolicious::Lite;
-
-  plugin surveil => { path => "/surveil" };
-
-  websocket "/surveil" => sub {
-    my $c = shift;
-
-    $c->on(message => sub {
-      my ($c, $action) = @_;
-      warn "User event: $action\n";
-    });
-  };
-
-  app->start;
-
-=head1 CONFIG
-
-This plugin can take the following config params:
-
-=over 4
-
-=item * enable_param = "..."
-
-Used to specify a query parameter to be part of the URL to enable surveil.
-
-Default is not to require any query parameter.
-
-=item * events = [...]
-
-The events that should be reported back over the WebSocket.
-
-Defaults to click, touchstart, touchcancel and touchend.
-(The default list is EXPERIMENTAL).
-
-=item * path = "...";
-
-The path to the WebSocket route.
-
-Defaults to C</mojolicious/plugin/surveil>. Emitting the "path" parameter will
-also add a default WebSocket route which simply log with "debug" the action
-that was taken. (The format of the logging is EXPERIMENTAL)
-
-=back
+Visit L<http://localhost:3000?_surveil=1> to enable the logging. Try clicking
+around on your page and look in the console for log messages.
 
 =head1 METHODS
 
 =head2 register
 
-  $self->register($app, $config);
+  $self->register($app, \%config);
 
 Used to add an "after_render" hook into the application which adds a
-JavaScript to every HTML document.
+JavaScript to every HTML document when the L</enable_param> is set.
+
+C<%config> can have the following settings:
+
+=over 2
+
+=item * enable_param
+
+Used to specify a query parameter to be part of the URL to enable surveil.
+
+Default is "_surveil".
+
+=item * events
+
+The events that should be reported back over the WebSocket.
+
+Defaults to blur, click, focus, touchstart, touchcancel and touchend.
+
+Note that the default list might change in the future.
+
+=item * path
+
+The path to the WebSocket route.
+
+Defaults to C</mojolicious/plugin/surveil>.
+
+=back
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2014, Jan Henning Thorsen
+Copyright (C) 2014-2018, Jan Henning Thorsen
 
 This program is free software, you can redistribute it and/or modify it under
 the terms of the Artistic License version 2.0.
