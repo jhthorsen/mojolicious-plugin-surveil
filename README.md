@@ -4,7 +4,7 @@ Mojolicious::Plugin::Surveil - Surveil user actions
 
 # VERSION
 
-0.02
+0.03
 
 # DESCRIPTION
 
@@ -29,11 +29,32 @@ resource.
 Visit [http://localhost:3000?\_surveil=1](http://localhost:3000?_surveil=1) to enable the logging. Try clicking
 around on your page and look in the console for log messages.
 
+## Custom event handler
+
+    use Mojo::Redis;
+    use Mojo::JSON "encode_json";
+
+    plugin "surveil", {
+      handler => sub {
+        my ($c, $event) = @_;
+        my $ip = $c->tx->remote_address;
+        $c->redis->pubsub->notify("surveil:$ip" => encode_json $event);
+      }
+    };
+
+The above example is useful if you want to publish the events to
+[Redis](https://metacpan.org/pod/Mojo::Redis) instead of a log file. A developer can then run commands
+below to see what a given user is doing:
+
+    $ redis-cli psubscribe "surveil:*"
+    $ redis-cli subscribe "surveil:192.168.0.100"
+
 # METHODS
 
 ## register
 
     $self->register($app, \%config);
+    $app->plugin("surveil" => \%config);
 
 Used to add an "after\_render" hook into the application which adds a
 JavaScript to every HTML document when the ["enable\_param"](#enable_param) is set.
@@ -53,6 +74,11 @@ JavaScript to every HTML document when the ["enable\_param"](#enable_param) is s
     Defaults to blur, click, focus, touchstart, touchcancel and touchend.
 
     Note that the default list might change in the future.
+
+- handler
+
+    A code ref that handles the events from the web page. This is useful if you
+    want to post them to an event bus instead of in the log file.
 
 - path
 
