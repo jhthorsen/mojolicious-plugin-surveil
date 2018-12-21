@@ -10,7 +10,7 @@ sub register {
 
   $app->defaults(
     surveil => {
-      enable_param => $config->{enable_param} || '',
+      enable_param => $config->{enable_param} || '_surveil',
       events       => $config->{events}       || [qw(blur click focus touchstart touchcancel touchend)],
       path         => '/mojolicious/plugin/surveil',
     }
@@ -37,8 +37,7 @@ sub _action_ws {
 sub _after_render_hook {
   my ($c, $output, $format) = @_;
   return if $format ne 'html';
-  my $enable_param = $c->stash->{surveil}{enable_param};
-  return if $enable_param and !$c->param($enable_param);
+  return if !$c->param($c->stash->{surveil}{enable_param});
 
   my $scheme = $c->req->url->to_abs->scheme || 'http';
   $scheme =~ s!^http!ws!;

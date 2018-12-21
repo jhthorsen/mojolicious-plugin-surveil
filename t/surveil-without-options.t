@@ -8,7 +8,7 @@ get '/' => 'index';
 
 my $t = Test::Mojo->new;
 
-$t->get_ok('/')->text_is('title', 'test surveil')->element_exists('script')
+$t->get_ok('/?_surveil=1')->text_is('title', 'test surveil')->element_exists('script')
   ->text_like('script', qr{socket = new WebSocket\("ws://[^:]+:\d+/mojolicious/plugin/surveil"\)})
   ->text_like('script', qr{document\.body\.addEventListener});
 
