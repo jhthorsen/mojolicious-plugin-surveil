@@ -2,11 +2,9 @@ use Mojo::Base -base;
 use Test::Mojo;
 use Test::More;
 
-{
-  use Mojolicious::Lite;
-  plugin 'surveil';
-  get '/' => 'index';
-}
+use Mojolicious::Lite;
+plugin 'surveil';
+get '/' => 'index';
 
 my $t = Test::Mojo->new;
 

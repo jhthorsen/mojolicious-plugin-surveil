@@ -1,66 +1,55 @@
 package Mojolicious::Plugin::Surveil;
 use Mojo::Base 'Mojolicious::Plugin';
 
-use Mojo::JSON qw(encode_json decode_json);
+use Mojo::JSON qw(decode_json encode_json);
 
 our $VERSION = '0.02';
 
 sub register {
   my ($self, $app, $config) = @_;
 
-  $config->{events} ||= [qw(blur click focus touchstart touchcancel touchend)];
+  $app->defaults(
+    surveil => {
+      enable_param => $config->{enable_param} || '',
+      events       => $config->{events}       || [qw(blur click focus touchstart touchcancel touchend)],
+      path         => '/mojolicious/plugin/surveil',
+    }
+  );
 
   push @{$app->renderer->classes}, __PACKAGE__;
-  $self->_after_render_hook($app, $config);
-  $self->_default_route($app, $config) unless $config->{path};
+  $app->hook(after_render => \&_after_render_hook);
+  $app->routes->websocket($app->defaults->{surveil}{path})->to(cb => \&_action_ws);
+}
+
+sub _action_ws {
+  my $c   = shift->inactivity_timeout(60);
+  my $log = $c->app->log;
+
+  $c->on(
+    message => sub {
+      my $action = decode_json $_[1];
+      my ($type, $target) = delete @$action{qw(type target)};
+      $log->debug(qq(Event "$type" on "$target" @{[encode_json $action]}));
+    }
+  );
 }
 
 sub _after_render_hook {
-  my ($self, $app, $config) = @_;
-  my $enable_param = $config->{enable_param};
+  my ($c, $output, $format) = @_;
+  return if $format ne 'html';
+  my $enable_param = $c->stash->{surveil}{enable_param};
+  return if $enable_param and !$c->param($enable_param);
 
-  $app->hook(
-    after_render => sub {
-      my ($c, $output, $format) = @_;
-      return if $format ne 'html';
-      return if $enable_param and !$c->param($enable_param);
-      my $js = $self->_javascript_code($c, $config);
-      $$output =~ s!</head>!$js</head>!;
-    }
-  );
-}
-
-sub _default_route {
-  my ($self, $app, $config) = @_;
-
-  $config->{path} = '/mojolicious/plugin/surveil';
-
-  $app->routes->websocket($config->{path})->to(
-    cb => sub {
-      my $c = shift;
-      $c->inactivity_timeout(60);
-      $c->on(
-        message => sub {
-          my $action = decode_json $_[1];
-          my ($type, $target) = (delete $action->{type}, delete $action->{target});
-          $app->log->debug(qq(Event "$type" on "$target" @{[encode_json $action]}));
-        }
-      );
-    }
-  );
-}
-
-sub _javascript_code {
-  my ($self, $c, $config) = @_;
   my $scheme = $c->req->url->to_abs->scheme || 'http';
-
   $scheme =~ s!^http!ws!;
 
-  $c->render_to_string(
+  my $js = $c->render_to_string(
     template    => 'mojolicious/plugin/surveil',
-    events      => encode_json($config->{events}),
-    surveil_url => $c->url_for($config->{path})->to_abs->scheme($scheme),
+    events      => encode_json($c->stash->{surveil}{events}),
+    surveil_url => $c->url_for($c->stash->{surveil}{path})->to_abs->scheme($scheme),
   );
+
+  $$output =~ s!</head>!$js</head>!;
 }
 
 1;
@@ -167,10 +156,10 @@ Jan Henning Thorsen - C<jhthorsen@cpan.org>
 __DATA__
 @@ mojolicious/plugin/surveil.html.ep
 <script type="text/javascript">
-window.addEventListener("load", function(e) {
+(function(w) {
   var events = <%== $events %>;
   var socket = new WebSocket("<%= $surveil_url %>");
-  var console = window.console = window.console || {};
+  var console = w.console;
 
   console.surveil = function() {
     socket.send(JSON.stringify({type: "console", target: "window", message: Array.prototype.slice.call(arguments)}));
@@ -192,5 +181,5 @@ window.addEventListener("load", function(e) {
       });
     }
   }
-});
+})(window);
 </script>
