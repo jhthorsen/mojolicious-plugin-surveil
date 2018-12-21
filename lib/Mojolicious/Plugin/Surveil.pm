@@ -10,25 +10,24 @@ sub register {
 
   $config->{enable_param} ||= '_surveil';
   $config->{events}       ||= [qw(blur click focus touchstart touchcancel touchend)];
+  $config->{handler}      ||= \&_default_message_handler;
   $config->{path}         ||= '/mojolicious/plugin/surveil';
 
   push @{$app->renderer->classes}, __PACKAGE__;
   $app->hook(after_render => sub { _hook_after_render($config, @_) });
-  $app->routes->websocket($config->{path})->to(cb => sub { _action_ws($config, @_) });
-}
 
-sub _action_ws {
-  my $config = shift;
-  my $c      = shift->inactivity_timeout(60);
-  my $log    = $c->app->log;
-
-  $c->on(
-    message => sub {
-      my $action = decode_json $_[1];
-      my ($type, $target) = delete @$action{qw(type target)};
-      $log->debug(qq(Event "$type" on "$target" @{[encode_json $action]}));
+  $app->routes->websocket($config->{path})->to(
+    cb => sub {
+      my $c = shift->inactivity_timeout(60);
+      $c->on(json => $config->{handler});
     }
   );
+}
+
+sub _default_message_handler {
+  my ($c,    $e)      = @_;
+  my ($type, $target) = delete @$e{qw(type target)};
+  $c->app->log->debug(qq(Event "$type" on "$target" @{[encode_json $e]}));
 }
 
 sub _hook_after_render {
@@ -83,11 +82,32 @@ resource.
 Visit L<http://localhost:3000?_surveil=1> to enable the logging. Try clicking
 around on your page and look in the console for log messages.
 
+=head2 Custom event handler
+
+  use Mojo::Redis;
+  use Mojo::JSON "encode_json";
+
+  plugin "surveil", {
+    handler => sub {
+      my ($c, $event) = @_;
+      my $ip = $c->tx->remote_address;
+      $c->redis->pubsub->notify("surveil:$ip" => encode_json $event);
+    }
+  };
+
+The above example is useful if you want to publish the events to
+L<Redis|Mojo::Redis> instead of a log file. A developer can then run commands
+below to see what a given user is doing:
+
+  $ redis-cli psubscribe "surveil:*"
+  $ redis-cli subscribe "surveil:192.168.0.100"
+
 =head1 METHODS
 
 =head2 register
 
   $self->register($app, \%config);
+  $app->plugin("surveil" => \%config);
 
 Used to add an "after_render" hook into the application which adds a
 JavaScript to every HTML document when the L</enable_param> is set.
@@ -109,6 +129,11 @@ The events that should be reported back over the WebSocket.
 Defaults to blur, click, focus, touchstart, touchcancel and touchend.
 
 Note that the default list might change in the future.
+
+=item * handler
+
+A code ref that handles the events from the web page. This is useful if you
+want to post them to an event bus instead of in the log file.
 
 =item * path
 
@@ -147,7 +172,7 @@ __DATA__
     socket.send(JSON.stringify({type: "load", target: "window"}));
     for (i = 0; i < events.length; i++) {
       document.body.addEventListener(events[i], function(e) {
-        var data = { extra: {} };
+        var data = {extra: {}};
         for (var prop in e) {
           if (!(typeof e[prop]).match(/^(boolean|number|string)$/)) continue;
           if (prop.match(/^[A-Z]/)) continue;
